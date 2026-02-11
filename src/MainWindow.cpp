@@ -293,6 +293,20 @@ LRESULT CMainWindow::v_WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 			if ((wParam & 0xFFF0) == SC_CLOSE && _fApplying)
 				return 0;
 			goto DWP;
+		case WM_DROPFILES:
+		{
+			UINT nFiles = DragQueryFileW((HDROP)wParam, UINT32_MAX, nullptr, 0);
+			if (nFiles == 1)
+			{
+				WCHAR szFile[MAX_PATH];
+				if (DragQueryFileW((HDROP)wParam, 0, szFile, ARRAYSIZE(szFile)))
+				{
+					_UnloadPack();
+					_LoadPack(szFile, LoadSource::Default);
+				}
+			}
+			return 0;
+		}
 		default:
 DWP:
 			return DefWindowProcW(hWnd, uMsg, wParam, lParam);
@@ -353,6 +367,14 @@ void CMainWindow::_OnCreate()
 		{ FVIRTKEY | FCONTROL, 'W', IDM_FILEUNLOAD }
 	};
 	_hAccel = CreateAcceleratorTableW((LPACCEL)s_rgAccels, ARRAYSIZE(s_rgAccels));
+
+	DragAcceptFiles(_hwnd, TRUE);
+	
+	/* We need to do this in order to drag from unelevated processes. */
+	ChangeWindowMessageFilterEx(_hwnd, WM_DROPFILES, MSGFLT_ALLOW, nullptr);
+	ChangeWindowMessageFilterEx(_hwnd, WM_COPYDATA, MSGFLT_ALLOW, nullptr);
+	// 0x0049 = WM_COPYGLOBALDATA
+	ChangeWindowMessageFilterEx(_hwnd, 0x0049, MSGFLT_ALLOW, nullptr);
 
 	static LPCWSTR s_rgMetaNames[MI_COUNT] = {
 		_pTranslations->pack_name,
